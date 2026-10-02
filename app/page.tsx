@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 
 type Lang = "en" | "hi" | "ta" | "ml" | "te";
 
@@ -185,19 +186,20 @@ export default function Home() {
             marginTop: 36,
           }}
         >
-          <button
+          <Link
+            href={`/request?lang=${lang}`}
             style={{
               background: "#6aa89a",
               color: "white",
-              border: "none",
               padding: "14px 30px",
               borderRadius: 999,
               fontSize: 17,
-              cursor: "pointer",
+              textDecoration: "none",
             }}
           >
             {t.need}
-          </button>
+          </Link>
+          
           <button
             style={{
               background: "rgba(255,255,255,0.7)",

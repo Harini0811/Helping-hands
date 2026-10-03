@@ -200,7 +200,8 @@ export default function Home() {
             {t.need}
           </Link>
           
-          <button
+          <Link
+            href="/account"
             style={{
               background: "rgba(255,255,255,0.7)",
               color: "#4f8a7c",
@@ -208,11 +209,11 @@ export default function Home() {
               padding: "14px 30px",
               borderRadius: 999,
               fontSize: 17,
-              cursor: "pointer",
+              textDecoration: "none",
             }}
           >
             {t.help}
-          </button>
+          </Link>
         </div>
       </section>
 

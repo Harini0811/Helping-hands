@@ -84,6 +84,9 @@ export default function ProfilePage() {
           <Link href="/browse" style={{ color: "#4f8a7c", textDecoration: "none" }}>
             Find people to help →
           </Link>
+          <Link href="/campaigns" style={{ color: "#4f8a7c", textDecoration: "none" }}>
+            Campaigns →
+          </Link>
         </div>
 
         {loading ? (
@@ -135,6 +138,23 @@ export default function ProfilePage() {
                   </div>
                 )}
               </div>
+              {p.type === "organization" && p.verified && (
+                <div style={{ marginTop: 22 }}>
+                  <Link
+                    href="/campaigns/new"
+                    style={{
+                      background: "#6aa89a",
+                      color: "white",
+                      padding: "12px 28px",
+                      borderRadius: 999,
+                      textDecoration: "none",
+                      fontSize: 16,
+                    }}
+                  >
+                    Start a campaign
+                  </Link>
+                </div>
+              )}
 
               <button
                 onClick={logout}

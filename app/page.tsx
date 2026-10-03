@@ -101,6 +101,13 @@ const T: Record<Lang, Copy> = {
 export default function Home() {
   const [lang, setLang] = useState<Lang>("en");
   const t = T[lang];
+  const campLabel = {
+    en: "Campaigns",
+    hi: "अभियान",
+    ta: "பிரச்சாரங்கள்",
+    ml: "ക്യാമ്പെയ്‌നുകൾ",
+    te: "ప్రచారాలు",
+  }[lang];
 
   return (
     <main
@@ -213,6 +220,20 @@ export default function Home() {
             }}
           >
             {t.help}
+          </Link>
+          <Link
+            href="/campaigns"
+            style={{
+              background: "rgba(255,255,255,0.7)",
+              color: "#4f8a7c",
+              border: "1.5px solid #8fbfb3",
+              padding: "14px 30px",
+              borderRadius: 999,
+              fontSize: 17,
+              textDecoration: "none",
+            }}
+          >
+            {campLabel}
           </Link>
         </div>
       </section>

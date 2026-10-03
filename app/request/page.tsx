@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { supabase } from "../../lib/supabase";
 
 type Lang = "en" | "hi" | "ta" | "ml" | "te";
 
@@ -20,6 +21,7 @@ type Copy = {
   phone: string;
   note: string;
   submit: string;
+  err: string;
   doneTitle: string;
   doneText: string;
   again: string;
@@ -49,6 +51,7 @@ const T: Record<Lang, Copy> = {
     phone: "Mobile number",
     note: "Kept private. Shared only after a helper is matched.",
     submit: "Submit request",
+    err: "Something went wrong. Please try again.",
     doneTitle: "Thank you. We have received your request.",
     doneText: "Our team will verify it soon. Please keep your phone nearby.",
     again: "Submit another request",
@@ -68,6 +71,7 @@ const T: Record<Lang, Copy> = {
     phone: "मोबाइल नंबर",
     note: "गोपनीय रखा जाएगा। मददगार से जुड़ने के बाद ही साझा होगा।",
     submit: "अनुरोध भेजें",
+    err: "कुछ गड़बड़ हो गई। कृपया फिर से कोशिश करें।",
     doneTitle: "धन्यवाद। हमें आपका अनुरोध मिल गया है।",
     doneText: "हमारी टीम जल्द ही इसकी जाँच करेगी। कृपया अपना फ़ोन पास रखें।",
     again: "एक और अनुरोध भेजें",
@@ -87,6 +91,7 @@ const T: Record<Lang, Copy> = {
     phone: "கைபேசி எண்",
     note: "ரகசியமாக வைக்கப்படும். உதவியாளருடன் இணைக்கப்பட்ட பின்பே பகிரப்படும்.",
     submit: "கோரிக்கையை அனுப்பு",
+    err: "ஏதோ தவறு நடந்தது. மீண்டும் முயற்சிக்கவும்.",
     doneTitle: "நன்றி. உங்கள் கோரிக்கை கிடைத்தது.",
     doneText: "எங்கள் குழு விரைவில் சரிபார்க்கும். உங்கள் தொலைபேசியை அருகில் வைத்திருங்கள்.",
     again: "மற்றொரு கோரிக்கை அனுப்பு",
@@ -106,6 +111,7 @@ const T: Record<Lang, Copy> = {
     phone: "മൊബൈൽ നമ്പർ",
     note: "രഹസ്യമായി സൂക്ഷിക്കും. സഹായിക്കുന്ന ആളുമായി ബന്ധിപ്പിച്ച ശേഷം മാത്രം പങ്കിടും.",
     submit: "അഭ്യർത്ഥന സമർപ്പിക്കുക",
+    err: "എന്തോ പിശക് സംഭവിച്ചു. വീണ്ടും ശ്രമിക്കുക.",
     doneTitle: "നന്ദി. നിങ്ങളുടെ അഭ്യർത്ഥന ലഭിച്ചു.",
     doneText: "ഞങ്ങളുടെ ടീം ഉടൻ പരിശോധിക്കും. ദയവായി ഫോൺ അടുത്ത് സൂക്ഷിക്കുക.",
     again: "മറ്റൊരു അഭ്യർത്ഥന സമർപ്പിക്കുക",
@@ -125,6 +131,7 @@ const T: Record<Lang, Copy> = {
     phone: "మొబైల్ నంబర్",
     note: "గోప్యంగా ఉంచబడుతుంది. సహాయకుడితో కలిపిన తర్వాత మాత్రమే పంచుకోబడుతుంది.",
     submit: "అభ్యర్థనను పంపండి",
+    err: "ఏదో తప్పు జరిగింది. దయచేసి మళ్ళీ ప్రయత్నించండి.",
     doneTitle: "ధన్యవాదాలు. మీ అభ్యర్థన అందింది.",
     doneText: "మా బృందం త్వరలో ధృవీకరిస్తుంది. దయచేసి మీ ఫోన్‌ను దగ్గర ఉంచుకోండి.",
     again: "మరొక అభ్యర్థన పంపండి",
@@ -153,12 +160,39 @@ const label = {
 export default function RequestPage() {
   const [lang, setLang] = useState<Lang>("en");
   const [done, setDone] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [err, setErr] = useState(false);
   const t = T[lang];
 
   useEffect(() => {
     const p = new URLSearchParams(window.location.search).get("lang");
     if (p && p in T) setLang(p as Lang);
   }, []);
+
+  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const f = new FormData(e.currentTarget);
+    setSending(true);
+    setErr(false);
+
+    const { error } = await supabase.from("requests").insert({
+      category: T.en.cats[Number(f.get("category"))],
+      title: String(f.get("title")),
+      details: String(f.get("details")),
+      city: String(f.get("city")),
+      urgency: T.en.urgs[Number(f.get("urgency"))],
+      phone: String(f.get("phone")),
+    });
+
+    setSending(false);
+    if (error) {
+      console.log(error);
+      setErr(true);
+      return;
+    }
+    setDone(true);
+    window.scrollTo(0, 0);
+  }
 
   return (
     <main
@@ -239,15 +273,9 @@ export default function RequestPage() {
               {t.sub}
             </p>
 
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                setDone(true);
-                window.scrollTo(0, 0);
-              }}
-            >
+            <form onSubmit={onSubmit}>
               <label style={label}>{t.cat}</label>
-              <select required style={field} defaultValue="">
+              <select name="category" required style={field} defaultValue="">
                 <option value="" disabled></option>
                 {t.cats.map((c, i) => (
                   <option key={i} value={i}>
@@ -257,16 +285,22 @@ export default function RequestPage() {
               </select>
 
               <label style={label}>{t.title}</label>
-              <input required maxLength={80} placeholder={t.ph} style={field} />
+              <input
+                name="title"
+                required
+                maxLength={80}
+                placeholder={t.ph}
+                style={field}
+              />
 
               <label style={label}>{t.details}</label>
-              <textarea required rows={4} style={field} />
+              <textarea name="details" required rows={4} style={field} />
 
               <label style={label}>{t.city}</label>
-              <input required style={field} />
+              <input name="city" required style={field} />
 
               <label style={label}>{t.urg}</label>
-              <select required style={field} defaultValue="">
+              <select name="urgency" required style={field} defaultValue="">
                 <option value="" disabled></option>
                 {t.urgs.map((u, i) => (
                   <option key={i} value={i}>
@@ -277,6 +311,7 @@ export default function RequestPage() {
 
               <label style={label}>{t.phone}</label>
               <input
+                name="phone"
                 required
                 inputMode="tel"
                 pattern="[0-9+ ]{10,13}"
@@ -284,8 +319,13 @@ export default function RequestPage() {
               />
               <small style={{ color: "#7a9298" }}>{t.note}</small>
 
+              {err && (
+                <p style={{ color: "#b45309", marginTop: 16 }}>{t.err}</p>
+              )}
+
               <button
                 type="submit"
+                disabled={sending}
                 style={{
                   display: "block",
                   width: "100%",
@@ -297,6 +337,7 @@ export default function RequestPage() {
                   borderRadius: 999,
                   fontSize: 17,
                   cursor: "pointer",
+                  opacity: sending ? 0.6 : 1,
                 }}
               >
                 {t.submit}

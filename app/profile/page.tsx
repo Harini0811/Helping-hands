@@ -13,6 +13,14 @@ type Profile = {
   verified: boolean;
 };
 
+type Help = {
+  id: string;
+  created_at: string;
+  title: string;
+  category: string;
+  city: string;
+};
+
 const LABEL: Record<string, string> = {
   individual: "Individual donor",
   volunteer: "Volunteer",
@@ -22,19 +30,53 @@ const LABEL: Record<string, string> = {
 export default function ProfilePage() {
   const router = useRouter();
   const [p, setP] = useState<Profile | null>(null);
+  const [history, setHistory] = useState<Help[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data }) => {
+    async function load() {
+      const { data } = await supabase.auth.getSession();
       if (!data.session) return router.push("/account");
+      const uid = data.session.user.id;
+
       const { data: row } = await supabase
         .from("profiles")
         .select("*")
-        .eq("id", data.session.user.id)
+        .eq("id", uid)
         .maybeSingle();
       setP(row as Profile | null);
+
+      const { data: helps } = await supabase
+        .from("helps")
+        .select("request_id, created_at")
+        .eq("helper_id", uid)
+        .order("created_at", { ascending: false });
+
+      const ids = (helps || []).map((h) => h.request_id as string);
+      if (ids.length > 0) {
+        const { data: reqs } = await supabase
+          .from("open_requests")
+          .select("id, title, category, city")
+          .in("id", ids);
+        const list: Help[] = (helps || []).flatMap((h) => {
+          const r = (reqs || []).find((x) => x.id === h.request_id);
+          return r
+            ? [
+                {
+                  id: r.id as string,
+                  created_at: h.created_at as string,
+                  title: r.title as string,
+                  category: r.category as string,
+                  city: r.city as string,
+                },
+              ]
+            : [];
+        });
+        setHistory(list);
+      }
       setLoading(false);
-    });
+    }
+    load();
   }, [router]);
 
   async function logout() {
@@ -52,63 +94,103 @@ export default function ProfilePage() {
         padding: "30px 16px 60px",
       }}
     >
-      <div style={{ maxWidth: 560, margin: "0 auto" }}>
-        <Link href="/" style={{ color: "#4f8a7c", textDecoration: "none" }}>
-          ← Back to home
-        </Link>
+      <div style={{ maxWidth: 600, margin: "0 auto" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
+          <Link href="/" style={{ color: "#4f8a7c", textDecoration: "none" }}>
+            ← Back to home
+          </Link>
+          <Link href="/browse" style={{ color: "#4f8a7c", textDecoration: "none" }}>
+            Find people to help →
+          </Link>
+        </div>
 
         {loading ? (
           <p>Loading…</p>
         ) : !p ? (
           <p>No profile found for this account.</p>
         ) : (
-          <div
-            style={{
-              marginTop: 24,
-              background: "rgba(255,255,255,0.75)",
-              border: "1px solid #dbe8e4",
-              borderRadius: 20,
-              padding: 28,
-              textAlign: "center",
-            }}
-          >
-            <div style={{ fontSize: 48 }}>🤝</div>
-            <h1 style={{ fontWeight: 400, margin: "8px 0" }}>{p.name}</h1>
-            <div style={{ color: "#5f7b82" }}>
-              {LABEL[p.type]} · {p.city}
-            </div>
+          <>
             <div
               style={{
-                display: "inline-block",
-                marginTop: 12,
-                padding: "4px 14px",
-                borderRadius: 999,
-                fontSize: 14,
-                background: p.verified ? "#d7ece5" : "#f3ead9",
-                color: p.verified ? "#2f7d6d" : "#8a6a2f",
-              }}
-            >
-              {p.verified ? "✔ Verified" : "Awaiting verification"}
-            </div>
-            {p.about && (
-              <p style={{ lineHeight: 1.7, color: "#5f7b82", marginTop: 20 }}>{p.about}</p>
-            )}
-            <button
-              onClick={logout}
-              style={{
                 marginTop: 24,
-                background: "rgba(255,255,255,0.9)",
-                color: "#4f8a7c",
-                border: "1px solid #b9d3cc",
-                padding: "10px 24px",
-                borderRadius: 999,
-                cursor: "pointer",
-                fontSize: 15,
+                background: "rgba(255,255,255,0.75)",
+                border: "1px solid #dbe8e4",
+                borderRadius: 20,
+                padding: 28,
+                textAlign: "center",
               }}
             >
-              Log out
-            </button>
-          </div>
+              <div style={{ fontSize: 48 }}>🤝</div>
+              <h1 style={{ fontWeight: 400, margin: "8px 0" }}>{p.name}</h1>
+              <div style={{ color: "#5f7b82" }}>
+                {LABEL[p.type]} · {p.city}
+              </div>
+              <div
+                style={{
+                  display: "inline-block",
+                  marginTop: 12,
+                  padding: "4px 14px",
+                  borderRadius: 999,
+                  fontSize: 14,
+                  background: p.verified ? "#d7ece5" : "#f3ead9",
+                  color: p.verified ? "#2f7d6d" : "#8a6a2f",
+                }}
+              >
+                {p.verified ? "✔ Verified" : "Awaiting verification"}
+              </div>
+              {p.about && (
+                <p style={{ lineHeight: 1.7, color: "#5f7b82", marginTop: 20 }}>{p.about}</p>
+              )}
+
+              <div style={{ marginTop: 22 }}>
+                <div style={{ fontSize: 40, color: "#4f8a7c" }}>{history.length}</div>
+                <div style={{ color: "#7a9298", fontSize: 14 }}>
+                  {history.length === 1 ? "person helped" : "people helped"}
+                </div>
+              </div>
+
+              <button
+                onClick={logout}
+                style={{
+                  marginTop: 22,
+                  background: "rgba(255,255,255,0.9)",
+                  color: "#4f8a7c",
+                  border: "1px solid #b9d3cc",
+                  padding: "10px 24px",
+                  borderRadius: 999,
+                  cursor: "pointer",
+                  fontSize: 15,
+                }}
+              >
+                Log out
+              </button>
+            </div>
+
+            <h2 style={{ fontWeight: 400, margin: "32px 0 14px" }}>Help history</h2>
+            {history.length === 0 && (
+              <p style={{ color: "#7a9298" }}>
+                No help recorded yet. When you offer help on a request, it will appear here.
+              </p>
+            )}
+            {history.map((h) => (
+              <div
+                key={h.id}
+                style={{
+                  background: "rgba(255,255,255,0.75)",
+                  border: "1px solid #dbe8e4",
+                  borderRadius: 16,
+                  padding: "16px 20px",
+                  marginBottom: 12,
+                }}
+              >
+                <div style={{ fontSize: 13, color: "#7a9298" }}>
+                  {h.category} · {new Date(h.created_at).toLocaleDateString()}
+                </div>
+                <div style={{ fontSize: 18, margin: "4px 0" }}>{h.title}</div>
+                <div style={{ fontSize: 14, color: "#5f7b82" }}>📍 {h.city}</div>
+              </div>
+            ))}
+          </>
         )}
       </div>
     </main>

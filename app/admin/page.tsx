@@ -16,7 +16,17 @@ type Req = {
   status: string;
 };
 
-const FILTERS = ["submitted", "verified", "rejected"];
+type HelpRow = {
+  id: string;
+  created_at: string;
+  status: string;
+  request_id: string;
+  helper_id: string;
+};
+
+type Prof = { id: string; name: string; type: string };
+
+const FILTERS = ["submitted", "verified", "rejected", "help"];
 
 export default function AdminPage() {
   const [signedIn, setSignedIn] = useState(false);
@@ -25,6 +35,8 @@ export default function AdminPage() {
   const [password, setPassword] = useState("");
   const [loginErr, setLoginErr] = useState("");
   const [rows, setRows] = useState<Req[]>([]);
+  const [helps, setHelps] = useState<HelpRow[]>([]);
+  const [profs, setProfs] = useState<Prof[]>([]);
   const [filter, setFilter] = useState("submitted");
 
   async function load() {
@@ -33,6 +45,15 @@ export default function AdminPage() {
       .select("*")
       .order("created_at", { ascending: false });
     setRows((data as Req[]) || []);
+
+    const { data: h } = await supabase
+      .from("helps")
+      .select("id, created_at, status, request_id, helper_id")
+      .order("created_at", { ascending: false });
+    setHelps((h as HelpRow[]) || []);
+
+    const { data: p } = await supabase.from("profiles").select("id, name, type");
+    setProfs((p as Prof[]) || []);
   }
 
   useEffect(() => {
@@ -48,10 +69,7 @@ export default function AdminPage() {
   async function login(e: React.FormEvent) {
     e.preventDefault();
     setLoginErr("");
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
       setLoginErr("Wrong email or password.");
       return;
@@ -64,18 +82,28 @@ export default function AdminPage() {
     await supabase.auth.signOut();
     setSignedIn(false);
     setRows([]);
+    setHelps([]);
   }
 
   async function setStatus(id: string, status: string) {
-    const { error } = await supabase
-      .from("requests")
-      .update({ status })
-      .eq("id", id);
+    const { error } = await supabase.from("requests").update({ status }).eq("id", id);
     if (error) {
       alert("Could not update. Please try again.");
       return;
     }
     setRows((r) => r.map((x) => (x.id === id ? { ...x, status } : x)));
+  }
+
+  async function markDelivered(id: string) {
+    const { error } = await supabase
+      .from("helps")
+      .update({ status: "delivered", delivered_at: new Date().toISOString() })
+      .eq("id", id);
+    if (error) {
+      alert("Could not update. Please try again.");
+      return;
+    }
+    setHelps((h) => h.map((x) => (x.id === id ? { ...x, status: "delivered" } : x)));
   }
 
   const page = {
@@ -106,35 +134,24 @@ export default function AdminPage() {
     cursor: "pointer",
   });
 
-  if (checking) {
-    return <main style={page}>Loading…</main>;
-  }
+  const card = {
+    background: "rgba(255,255,255,0.75)",
+    border: "1px solid #dbe8e4",
+    borderRadius: 18,
+    padding: 20,
+    marginBottom: 14,
+  };
+
+  if (checking) return <main style={page}>Loading…</main>;
 
   if (!signedIn) {
     return (
       <main style={page}>
-        <form
-          onSubmit={login}
-          style={{ maxWidth: 380, margin: "80px auto 0", textAlign: "center" }}
-        >
+        <form onSubmit={login} style={{ maxWidth: 380, margin: "80px auto 0", textAlign: "center" }}>
           <div style={{ fontSize: 40 }}>🤝</div>
           <h1 style={{ fontWeight: 400 }}>Admin login</h1>
-          <input
-            type="email"
-            placeholder="Email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            style={input}
-          />
-          <input
-            type="password"
-            placeholder="Password"
-            required
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            style={input}
-          />
+          <input type="email" placeholder="Email" required value={email} onChange={(e) => setEmail(e.target.value)} style={input} />
+          <input type="password" placeholder="Password" required value={password} onChange={(e) => setPassword(e.target.value)} style={input} />
           {loginErr && <p style={{ color: "#b45309" }}>{loginErr}</p>}
           <button type="submit" style={{ ...btn("#6aa89a"), width: "100%" }}>
             Log in
@@ -150,20 +167,13 @@ export default function AdminPage() {
   }
 
   const shown = rows.filter((r) => r.status === filter);
+  const toConfirm = helps.filter((h) => h.status === "offered").length;
 
   return (
     <main style={page}>
       <div style={{ maxWidth: 820, margin: "0 auto" }}>
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            flexWrap: "wrap",
-            gap: 10,
-          }}
-        >
-          <h1 style={{ fontWeight: 400, margin: 0 }}>🤝 Review requests</h1>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+          <h1 style={{ fontWeight: 400, margin: 0 }}>🤝 Review</h1>
           <button onClick={logout} style={btn("rgba(255,255,255,0.8)", "#4f8a7c")}>
             Log out
           </button>
@@ -179,58 +189,77 @@ export default function AdminPage() {
                 textTransform: "capitalize",
               }}
             >
-              {f} ({rows.filter((r) => r.status === f).length})
+              {f === "help"
+                ? `Confirm help (${toConfirm})`
+                : `${f} (${rows.filter((r) => r.status === f).length})`}
             </button>
           ))}
         </div>
 
-        {shown.length === 0 && (
-          <p style={{ color: "#7a9298" }}>No {filter} requests.</p>
+        {filter === "help" ? (
+          <>
+            {helps.length === 0 && <p style={{ color: "#7a9298" }}>No help offers yet.</p>}
+            {helps.map((h) => {
+              const r = rows.find((x) => x.id === h.request_id);
+              const p = profs.find((x) => x.id === h.helper_id);
+              return (
+                <div key={h.id} style={card}>
+                  <div style={{ fontSize: 13, color: "#7a9298" }}>
+                    Offered {new Date(h.created_at).toLocaleString()}
+                  </div>
+                  <h3 style={{ fontWeight: 500, fontSize: 19, margin: "6px 0" }}>
+                    {p ? p.name : "Unknown helper"} → {r ? r.title : "Unknown request"}
+                  </h3>
+                  <div style={{ fontSize: 15, color: "#5f7b82" }}>
+                    {p ? p.type : ""} · 📍 {r ? r.city : ""} · 📞 {r ? r.phone : ""}
+                  </div>
+                  <div style={{ marginTop: 14 }}>
+                    {h.status === "delivered" ? (
+                      <span style={{ color: "#2f7d6d" }}>✔ Delivered</span>
+                    ) : (
+                      <button onClick={() => markDelivered(h.id)} style={btn("#6aa89a")}>
+                        Mark as delivered
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </>
+        ) : (
+          <>
+            {shown.length === 0 && <p style={{ color: "#7a9298" }}>No {filter} requests.</p>}
+            {shown.map((r) => (
+              <div key={r.id} style={card}>
+                <div style={{ fontSize: 13, color: "#7a9298" }}>
+                  {r.category} · {r.urgency} · {new Date(r.created_at).toLocaleString()}
+                </div>
+                <h3 style={{ fontWeight: 500, fontSize: 20, margin: "6px 0" }}>{r.title}</h3>
+                <p style={{ margin: "0 0 10px", lineHeight: 1.6, color: "#5f7b82" }}>{r.details}</p>
+                <div style={{ fontSize: 15 }}>
+                  📍 {r.city} &nbsp; 📞 {r.phone}
+                </div>
+                <div style={{ display: "flex", gap: 10, marginTop: 14, flexWrap: "wrap" }}>
+                  {r.status !== "verified" && (
+                    <button onClick={() => setStatus(r.id, "verified")} style={btn("#6aa89a")}>
+                      Verify
+                    </button>
+                  )}
+                  {r.status !== "rejected" && (
+                    <button onClick={() => setStatus(r.id, "rejected")} style={btn("#c98a6b")}>
+                      Reject
+                    </button>
+                  )}
+                  {r.status !== "submitted" && (
+                    <button onClick={() => setStatus(r.id, "submitted")} style={btn("rgba(255,255,255,0.9)", "#4a6a70")}>
+                      Move back to submitted
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </>
         )}
-
-        {shown.map((r) => (
-          <div
-            key={r.id}
-            style={{
-              background: "rgba(255,255,255,0.75)",
-              border: "1px solid #dbe8e4",
-              borderRadius: 18,
-              padding: 20,
-              marginBottom: 14,
-            }}
-          >
-            <div style={{ fontSize: 13, color: "#7a9298" }}>
-              {r.category} · {r.urgency} ·{" "}
-              {new Date(r.created_at).toLocaleString()}
-            </div>
-            <h3 style={{ fontWeight: 500, fontSize: 20, margin: "6px 0" }}>
-              {r.title}
-            </h3>
-            <p style={{ margin: "0 0 10px", lineHeight: 1.6, color: "#5f7b82" }}>
-              {r.details}
-            </p>
-            <div style={{ fontSize: 15 }}>
-              📍 {r.city} &nbsp; 📞 {r.phone}
-            </div>
-            <div style={{ display: "flex", gap: 10, marginTop: 14, flexWrap: "wrap" }}>
-              {r.status !== "verified" && (
-                <button onClick={() => setStatus(r.id, "verified")} style={btn("#6aa89a")}>
-                  Verify
-                </button>
-              )}
-              {r.status !== "rejected" && (
-                <button onClick={() => setStatus(r.id, "rejected")} style={btn("#c98a6b")}>
-                  Reject
-                </button>
-              )}
-              {r.status !== "submitted" && (
-                <button onClick={() => setStatus(r.id, "submitted")} style={btn("rgba(255,255,255,0.9)", "#4a6a70")}>
-                  Move back to submitted
-                </button>
-              )}
-            </div>
-          </div>
-        ))}
       </div>
     </main>
   );

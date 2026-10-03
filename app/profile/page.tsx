@@ -16,6 +16,7 @@ type Profile = {
 type Help = {
   id: string;
   created_at: string;
+  status: string;
   title: string;
   category: string;
   city: string;
@@ -47,33 +48,11 @@ export default function ProfilePage() {
       setP(row as Profile | null);
 
       const { data: helps } = await supabase
-        .from("helps")
-        .select("request_id, created_at")
+        .from("public_helps")
+        .select("id, created_at, status, title, category, city")
         .eq("helper_id", uid)
         .order("created_at", { ascending: false });
-
-      const ids = (helps || []).map((h) => h.request_id as string);
-      if (ids.length > 0) {
-        const { data: reqs } = await supabase
-          .from("open_requests")
-          .select("id, title, category, city")
-          .in("id", ids);
-        const list: Help[] = (helps || []).flatMap((h) => {
-          const r = (reqs || []).find((x) => x.id === h.request_id);
-          return r
-            ? [
-                {
-                  id: r.id as string,
-                  created_at: h.created_at as string,
-                  title: r.title as string,
-                  category: r.category as string,
-                  city: r.city as string,
-                },
-              ]
-            : [];
-        });
-        setHistory(list);
-      }
+      setHistory((helps as Help[]) || []);
       setLoading(false);
     }
     load();
@@ -83,6 +62,9 @@ export default function ProfilePage() {
     await supabase.auth.signOut();
     router.push("/");
   }
+
+  const delivered = history.filter((h) => h.status === "delivered").length;
+  const pending = history.length - delivered;
 
   return (
     <main
@@ -143,10 +125,15 @@ export default function ProfilePage() {
               )}
 
               <div style={{ marginTop: 22 }}>
-                <div style={{ fontSize: 40, color: "#4f8a7c" }}>{history.length}</div>
+                <div style={{ fontSize: 40, color: "#4f8a7c" }}>{delivered}</div>
                 <div style={{ color: "#7a9298", fontSize: 14 }}>
-                  {history.length === 1 ? "person helped" : "people helped"}
+                  {delivered === 1 ? "person helped" : "people helped"}
                 </div>
+                {pending > 0 && (
+                  <div style={{ color: "#8a6a2f", fontSize: 13, marginTop: 6 }}>
+                    {pending} awaiting confirmation
+                  </div>
+                )}
               </div>
 
               <button
@@ -188,6 +175,15 @@ export default function ProfilePage() {
                 </div>
                 <div style={{ fontSize: 18, margin: "4px 0" }}>{h.title}</div>
                 <div style={{ fontSize: 14, color: "#5f7b82" }}>📍 {h.city}</div>
+                <div
+                  style={{
+                    marginTop: 8,
+                    fontSize: 13,
+                    color: h.status === "delivered" ? "#2f7d6d" : "#8a6a2f",
+                  }}
+                >
+                  {h.status === "delivered" ? "✔ Delivered" : "Awaiting confirmation"}
+                </div>
               </div>
             ))}
           </>

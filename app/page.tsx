@@ -201,7 +201,7 @@ export default function Home() {
           </Link>
           
           <Link
-            href="/account"
+            href="/browse"
             style={{
               background: "rgba(255,255,255,0.7)",
               color: "#4f8a7c",

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useLang } from "../lib/i18n";
 import Link from "next/link";
 
 type Lang = "en" | "hi" | "ta" | "ml" | "te";
@@ -200,7 +200,7 @@ const secondary = {
 };
 
 export default function Home() {
-  const [lang, setLang] = useState<Lang>("en");
+  const [lang, setLang] = useLang();
   const t = T[lang];
 
   return (
